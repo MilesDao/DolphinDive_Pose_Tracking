@@ -6,23 +6,30 @@ import numpy as np
 from PoseDetector import PoseDetector
 
 
-wCam, hCam = 1200, 720
+wCam, hCam = 640, 360
+
+CAM_W, CAM_H = 640, 360
+GAME_W, GAME_H = 432, 768
+
+WINDOW_W = CAM_W + GAME_W
+WINDOW_H = GAME_H
 
 def play_flappy_bird():
     # --- CAMERA & POSE ---
     cap = cv2.VideoCapture(0)
     cap.set(3, wCam)
     cap.set(4, hCam)
-    detector = PoseDetector()
+    detector = PoseDetector(model_path="yolov8n-pose.pt", use_gpu=True)
 
-    dir = 0
+    arm_raised = False
     trigger_fly = False
     flap_count = 0
 
     # ------------ FLAPPY BIRD CORE ------------
     pygame.mixer.pre_init(frequency=44100, size=-16, channels=2, buffer=512)
     pygame.init()
-    screen = pygame.display.set_mode((432, 768)) #screen game
+    screen = pygame.display.set_mode((WINDOW_W, WINDOW_H))
+    game_surface = pygame.Surface((GAME_W, GAME_H))
     clock = pygame.time.Clock()
     game_font = pygame.font.Font('assets/font/04B_19.TTF', 35)
 
@@ -33,19 +40,19 @@ def play_flappy_bird():
     score = 0
     high_score = 0
 
-    bg = pygame.image.load('assets/background-night.png').convert()
-    bg = pygame.transform.scale2x(bg)
+    bg = pygame.image.load('assets/background_day.png').convert()
+    bg = pygame.transform.smoothscale(bg, (GAME_W, GAME_H))
 
-    floor = pygame.image.load('assets/floor.png').convert()
+    floor = pygame.image.load('assets/floortemp.png').convert()
     floor = pygame.transform.scale2x(floor)
     floor_x_pos = 0
 
     bird_down = pygame.transform.scale2x(pygame.image.load(
-        'assets/down.png').convert_alpha())
+        'assets/yellowbird-downflap.png').convert_alpha())
     bird_mid = pygame.transform.scale2x(pygame.image.load(
-        'assets/mid.png').convert_alpha())
+        'assets/yellowbird-midflap.png').convert_alpha())
     bird_up = pygame.transform.scale2x(pygame.image.load(
-        'assets/up.png').convert_alpha())
+        'assets/yellowbird-upflap.png').convert_alpha())
 
     bird_list = [bird_down, bird_mid, bird_up]
     bird_index = 0
@@ -55,13 +62,13 @@ def play_flappy_bird():
     birdflap = pygame.USEREVENT + 1
     pygame.time.set_timer(birdflap, 200)
 
-    pipe_surface = pygame.image.load('assets/pipe.png').convert()
+    pipe_surface = pygame.image.load('assets/pipe-green.png').convert()
     pipe_surface = pygame.transform.scale2x(pipe_surface)
     pipe_list = []
+    scored_pipes = set()
 
-    spawnpipe = pygame.USEREVENT
-    pygame.time.set_timer(spawnpipe, 2500)
     pipe_height = range(250, 500)
+    frames_since_last_pipe = 0
 
     game_over_surface = pygame.transform.scale2x(
         pygame.image.load('assets/messagetemp.png').convert_alpha())
@@ -74,16 +81,17 @@ def play_flappy_bird():
 
     # ------------ GAME FUNCTIONS ------------
     def draw_floor():
-        screen.blit(floor, (floor_x_pos, 650))
-        screen.blit(floor, (floor_x_pos + 432, 650))
+        game_surface.blit(floor, (floor_x_pos, 650))
+        game_surface.blit(floor, (floor_x_pos + 432, 650))
 
     def create_pipe():
         random_pipe_pos = random.choice(pipe_height)
         bottom_pipe = pipe_surface.get_rect(midtop=(500, random_pipe_pos))
-        top_pipe = pipe_surface.get_rect(midtop=(500, random_pipe_pos - 750))
+        top_pipe = pipe_surface.get_rect(midbottom=(500, random_pipe_pos - 200))
         return bottom_pipe, top_pipe
 
     def move_pipe(pipes):
+        pipes = [pipe for pipe in pipes if pipe.right > -50]
         for pipe in pipes:
             pipe.centerx -= 5 
         return pipes
@@ -91,10 +99,26 @@ def play_flappy_bird():
     def draw_pipe(pipes):
         for pipe in pipes:
             if pipe.bottom >= 600:
-                screen.blit(pipe_surface, pipe)
+                game_surface.blit(pipe_surface, pipe)
             else:
                 flip_pipe = pygame.transform.flip(pipe_surface, False, True)
-                screen.blit(flip_pipe, pipe)
+                game_surface.blit(flip_pipe, pipe)
+
+    def pipe_score_check(pipes, bird_rect):
+        nonlocal score, scored_pipes
+
+        for pipe in pipes:
+            # chỉ tính pipe dưới
+            if pipe.bottom >= 600:
+
+                # chim đã bay qua pipe
+                if pipe.centerx < bird_rect.centerx:
+                    pid = id(pipe)
+
+                    if pid not in scored_pipes:
+                        scored_pipes.add(pid)
+                        score += 1
+                        score_sound.play()
 
     def check_collision(pipes):
         for pipe in pipes:
@@ -104,6 +128,21 @@ def play_flappy_bird():
         if bird_rect.top <= -75 or bird_rect.bottom >= 650:
             return False
         return True
+
+    def perform_flap():
+        nonlocal game_active, bird_movement, score, frames_since_last_pipe
+        if game_active:
+            bird_movement = 0
+            bird_movement = -10
+            flap_sound.play()
+        else:
+            game_active = True
+            pipe_list.clear()
+            bird_rect.center = (100, 384)
+            bird_movement = 0
+            score = 0
+            frames_since_last_pipe = 0
+            scored_pipes.clear()
 
     def rotate_bird(bird1):
         return pygame.transform.rotozoom(bird1, -bird_movement * 3, 1)
@@ -117,15 +156,15 @@ def play_flappy_bird():
         if game_state == 'main game':
             score_surface = game_font.render(str(int(score)), True, (255, 255, 255))
             score_rect = score_surface.get_rect(center=(216, 100))
-            screen.blit(score_surface, score_rect)
+            game_surface.blit(score_surface, score_rect)
         if game_state == 'game_over':
             score_surface = game_font.render(f'Score: {int(score)}', True, (255, 255, 255))
             score_rect = score_surface.get_rect(center=(216, 100))
-            screen.blit(score_surface, score_rect)
+            game_surface.blit(score_surface, score_rect)
             high_score_surface = game_font.render(
                 f'High Score: {int(high_score)}', True, (255, 255, 255))
             high_score_rect = high_score_surface.get_rect(center=(216, 630))
-            screen.blit(high_score_surface, high_score_rect)
+            game_surface.blit(high_score_surface, high_score_rect)
 
     def update_score(score, high_score):
         return score if score > high_score else high_score
@@ -142,104 +181,91 @@ def play_flappy_bird():
 
 
             if len(lmList) != 0:
-                hand_ids = [11, 12, 13, 14] # shoulder, elbow, wrist
+                hand_ids = [5, 6, 7, 8] # shoulder, elbow
                 for fid in hand_ids:
-                    _, x, y = lmList[fid]
-                    cv2.circle(img, (x, y), 8, (0, 128, 255), cv2.FILLED)  # màu cam
-                    cv2.putText(img, str(fid), (x - 10, y - 10),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+                    if len(lmList) > fid and lmList[fid][1] != 0:
+                        _, x, y = lmList[fid]
+                        cv2.circle(img, (x, y), 8, (0, 128, 255), cv2.FILLED)  # màu cam
+                        cv2.putText(img, str(fid), (x - 10, y - 10),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
 
                 # Nối xương tay trái & phải
-                cv2.line(img, lmList[11][1:], lmList[13][1:], (0, 128, 255), 2)
-                cv2.line(img, lmList[12][1:], lmList[14][1:], (0, 128, 255), 2)
+                if len(lmList) > 8 and lmList[5][1] != 0 and lmList[7][1] != 0:
+                    cv2.line(img, tuple(lmList[5][1:]), tuple(lmList[7][1:]), (0, 128, 255), 2)
+                if len(lmList) > 8 and lmList[6][1] != 0 and lmList[8][1] != 0:
+                    cv2.line(img, tuple(lmList[6][1:]), tuple(lmList[8][1:]), (0, 128, 255), 2)
 
                 # --- HAND CONTROL ---
-                angleRight = detector.findAngle(img, 14, 12, 24)
-                angleLeft = detector.findAngle(img, 13, 11, 23)
+                angleRight = detector.findAngle(img, 8, 6, 12)
+                angleLeft = detector.findAngle(img, 7, 5, 11)
                 perRight = np.interp(angleRight, (30, 80), (0, 100))
                 perLeft = np.interp(angleLeft, (30, 80), (0, 100))
 
                 if perRight > 20 and perLeft > 20:
-                    if dir == 0:
-                        dir = 1
+                    arm_raised = True
                 elif perRight < 5 and perLeft < 5:
-                    if dir == 1:
+                    if arm_raised:
                         trigger_fly = True
-                        dir = 0
+                        arm_raised = False
                 
                 cv2.putText(img, f"L:{int(perLeft)} R:{int(perRight)}", 
                 (30, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,255,0), 2)
 
-                status = "FLAP!" if trigger_fly else "UP" if dir == 1 else "READY"
+                status = "FLAP!" if trigger_fly else "UP" if arm_raised else "READY"
                 cv2.rectangle(img, (30, 150), (260, 25), (255, 255, 255), cv2.FILLED)
                 cv2.putText(img, status, (40, 100),
                             cv2.FONT_HERSHEY_COMPLEX, 1.5, (0, 0, 0), 2)
 
-            cv2.imshow("hehe", img)
-            if cv2.waitKey(1) == ord("q"):
-                break
+            # cv2.imshow("hehe", img)
+            # if cv2.waitKey(1) == ord("q"):
+            #     break
+            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            img_rgb = np.transpose(img_rgb, (1, 0, 2))
+            frame_surface = pygame.surfarray.make_surface(img_rgb)
 
             # --- PYGAME EVENTS ---
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     sys.exit()
-
+                    
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_SPACE and game_active:
-                        bird_movement = 0
-                        bird_movement = -10 
-                        flap_sound.play()
-                    if event.key == pygame.K_SPACE and not game_active:
-                        game_active = True
-                        pipe_list.clear()
-                        bird_rect.center = (100, 384)
-                        bird_movement = 0
-                        score = 0
-
-                if event.type == spawnpipe:
-                    pipe_list.extend(create_pipe())
+                    if event.key == pygame.K_SPACE:
+                        perform_flap()
 
                 if event.type == birdflap:
                     bird_index = (bird_index + 1) % 3
                     bird, bird_rect = bird_animation()
-
+                    
             if trigger_fly:
                 flap_count += 1
-                if game_active:
-                    bird_movement = 0
-                    bird_movement = -10
-                    flap_sound.play()
-                else:
-                    game_active = True
-                    pipe_list.clear()
-                    bird_rect.center = (100, 384)
-                    bird_movement = 0
-                    score = 0
+                perform_flap()
                 trigger_fly = False
 
             # --- GAME LOGIC ---
-            screen.blit(bg, (0, 0))
+            game_surface.blit(bg, (0, 0))
 
             if game_active:
+                # Pipe spawning
+                frames_since_last_pipe += 1
+                if frames_since_last_pipe >= 90:  # Spawn a pipe every 90 frames (90 frames * 5 pixels = 450 pixels spacing)
+                    pipe_list.extend(create_pipe())
+                    frames_since_last_pipe = 0
+
                 bird_movement += gravity  
                 rotated_bird = rotate_bird(bird)
                 bird_rect.centery += bird_movement
-                screen.blit(rotated_bird, bird_rect)
+                game_surface.blit(rotated_bird, bird_rect)
 
                 game_active = check_collision(pipe_list)
                 pipe_list = move_pipe(pipe_list)
                 draw_pipe(pipe_list)
+                pipe_score_check(pipe_list, bird_rect)
 
-                score += 0.01
                 score_display('main game')
 
-                score_sound_countdown -= 1
-                if score_sound_countdown <= 0:
-                    score_sound.play()
-                    score_sound_countdown = 100
             else:
-                screen.blit(game_over_surface, game_over_rect)
+                game_surface.blit(game_over_surface, game_over_rect)
                 high_score = update_score(score, high_score)
                 score_display('game_over')
 
@@ -248,12 +274,18 @@ def play_flappy_bird():
             if floor_x_pos <= -432:
                 floor_x_pos = 0
 
+            # --- RENDER TO MAIN SCREEN ---
+            screen.fill((0, 0, 0))  # Clear background
+            cam_surface = pygame.transform.scale(frame_surface, (CAM_W, CAM_H))
+            screen.blit(cam_surface, (0, 0))
+            screen.blit(game_surface, (CAM_W, 0))
+
             pygame.display.update()
             clock.tick(120)  
 
     finally:
         cap.release()
-        cv2.destroyAllWindows()
+        # cv2.destroyAllWindows()
         pygame.quit()
 
 

@@ -1,79 +1,67 @@
 import cv2
-import mediapipe as mp
 import math
-
+import numpy as np
+from ultralytics import YOLO
 
 class PoseDetector:
-    def __init__(
-        self,
-        static_image_mode=False,
-        model_complexity=1,
-        smooth_landmarks=True,
-        min_detection_confidence=0.5,
-        min_tracking_confidence=0.5,
-    ):
-
-        self.mpDraw = mp.solutions.drawing_utils
-        self.mpPose = mp.solutions.pose
-        self.pose = self.mpPose.Pose(
-            static_image_mode=static_image_mode,
-            model_complexity=model_complexity,
-            smooth_landmarks=smooth_landmarks,
-            min_detection_confidence=min_detection_confidence,
-            min_tracking_confidence=min_tracking_confidence,
-        )
+    def __init__(self, model_path="yolov8n-pose.pt", use_gpu=True):
+        self.device = 'cuda' if use_gpu else 'cpu'
+        self.model = YOLO(model_path)
+        self.model.to(self.device)
         self.results = None
         self.lmList = []
 
     def findPose(self, img, draw=True):
         """Find pose in image and draw skeleton if needed"""
-        imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        self.results = self.pose.process(imgRGB)
-
-        if self.results.pose_landmarks and draw:
-            h, w, _ = img.shape
-            important_ids = [11, 12, 13, 14]
-            for idx, lm in enumerate(self.results.pose_landmarks.landmark):
-                if idx in important_ids:
-                    cx, cy = int(lm.x * w), int(lm.y * h)
-                    cv2.circle(img, (cx, cy), 8, (0, 128, 255), cv2.FILLED)
-                    cv2.putText(img, str(idx), (cx - 10, cy - 10),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
-            # Connect shoulders–elbows on both sides
-            lms = self.results.pose_landmarks.landmark
-            points = {i: (int(lms[i].x * w), int(lms[i].y * h)) for i in important_ids}
-            if 11 in points and 13 in points:
-                cv2.line(img, points[11], points[13], (0, 128, 255), 2)
-            if 12 in points and 14 in points:
-                cv2.line(img, points[12], points[14], (0, 128, 255), 2)
+        # run YOLO inference
+        self.results = self.model(img, verbose=False, device=self.device)
+        
+        if draw:
+            # ultralytics has a built-in plot function to draw keypoints
+            # but we can also draw manually or use plot()
+            annotated_img = self.results[0].plot()
+            return annotated_img
+        
         return img
 
     def findPosition(self, img, draw=False):
         """Returns the list of coordinates (id, x, y) of the landmarks"""
         self.lmList = []
-        if not self.results or not self.results.pose_landmarks:
+        
+        if not self.results or len(self.results[0].keypoints) == 0:
             return self.lmList
 
-        h, w, _ = img.shape
-        for idx, lm in enumerate(self.results.pose_landmarks.landmark):
-            cx, cy = int(lm.x * w), int(lm.y * h)
-            self.lmList.append([idx, cx, cy])
-            if draw:
-                cv2.circle(img, (cx, cy), 5, (0, 0, 255), cv2.FILLED)
+        # get keypoints of the first person detected
+        # keypoints.data shape is (N, 17, 3) where 3 is (x, y, confidence)
+        keypoints = self.results[0].keypoints.data[0].cpu().numpy()
+        
+        for idx, kp in enumerate(keypoints):
+            x, y, conf = kp
+            if conf > 0.3: # only append confident keypoints
+                self.lmList.append([idx, int(x), int(y)])
+            else:
+                self.lmList.append([idx, 0, 0])
+                
+        if draw:
+            for item in self.lmList:
+                if item[1] != 0 or item[2] != 0:
+                    cv2.circle(img, (item[1], item[2]), 5, (0, 0, 255), cv2.FILLED)
 
         return self.lmList
 
     def findAngle(self, img, p1, p2, p3, draw=True):
         """
         Tính góc tại p2 tạo bởi 3 điểm p1, p2, p3.
-        Trả về giá trị góc (0–180°).
         """
         if not self.lmList or len(self.lmList) <= max(p1, p2, p3):
             return 0
-
-        x1, y1 = self.lmList[p1][1:]
-        x2, y2 = self.lmList[p2][1:]
-        x3, y3 = self.lmList[p3][1:]
+            
+        _, x1, y1 = self.lmList[p1]
+        _, x2, y2 = self.lmList[p2]
+        _, x3, y3 = self.lmList[p3]
+        
+        if (x1, y1) == (0, 0) or (x2, y2) == (0, 0) or (x3, y3) == (0, 0):
+            return 0
 
         # Calculate distance between points
         a = math.hypot(x3 - x2, y3 - y2)
@@ -85,7 +73,6 @@ class PoseDetector:
         else:
             # Law of cosines
             cos_b = (a**2 + c**2 - b**2) / (2 * a * c)
-            # Clamp cos_b to [-1, 1] to avoid math domain error due to floating point precision
             cos_b = max(-1.0, min(1.0, cos_b))
             angle = math.degrees(math.acos(cos_b))
 
@@ -97,35 +84,3 @@ class PoseDetector:
                 cv2.circle(img, (x, y), 12, (0, 255, 0), 2)
 
         return angle
-
-    def findBoundingBox(self):
-        """Returns the bounding box of the entire body (min_x, min_y, max_x, max_y)"""
-        if not self.lmList:
-            return None
-        xs = [pt[1] for pt in self.lmList]
-        ys = [pt[2] for pt in self.lmList]
-        return min(xs), min(ys), max(xs), max(ys)
-
-
-# if __name__ == "__main__":
-#     cap = cv2.VideoCapture(0)
-#     detector = PoseDetector()
-
-#     while True:
-#         success, img = cap.read()
-#         if not success:
-#             break
-#         img = detector.findPose(img)
-#         lmList = detector.findPosition(img, draw=False)
-#         if lmList:
-#             angle = detector.findAngle(img, 11, 13, 15)  # vai–khuỷu–cổ tay
-#             cv2.putText(img, f"Angle: {int(angle)}",
-#                         (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1,
-#                         (0, 255, 255), 2)
-
-#         cv2.imshow("Pose Detection", img)
-#         if cv2.waitKey(1) & 0xFF == ord('q'):
-#             break
-
-#     cap.release()
-#     cv2.destroyAllWindows()
