@@ -43,7 +43,7 @@ This avoids repeated flaps while the arms stay in the same position.
 
 ### 📦 4. How to run
 
-Requirements: Python ≤ 3.10
+Requirements: Python 3.8+
 
 4.1. Create virtual environment
 ```bash
