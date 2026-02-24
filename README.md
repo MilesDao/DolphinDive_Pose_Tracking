@@ -1,19 +1,21 @@
 <div align="center">
-    <h1>🎮 Flappy Bird – Pose Controlled Game (MediaPipe + OpenCV + Pygame)</h1>
+    <h1>🎮 Flappy Bird – Pose Controlled (YOLOv8 + OpenCV + Pygame)</h1>
 <hr/>
 </div>
 
-A Flappy Bird–style game controlled by **your arms** using real-time pose estimation.
-This project uses a webcam and human pose landmarks to let the player **flap by moving both arms down** instead of pressing a key.
+A Flappy Bird–style game controlled by **arm movements** using real-time human pose estimation with **YOLOv8 Pose**.
 
-Built as a computer-vision + game integration project.
+This project focuses on **real-time computer vision** and human–computer interaction.
 
 ### ✨ 1. Features
 
-- Control the bird using body movement (both arms)
-- Real-time pose tracking with MediaPipe
+- Control the bird by **raising and lowering both arms**
+- Real-time pose estimation using YOLOv8 pose model
 - Angle-based gesture detection (shoulder–elbow–hip)
-- Classic Flappy Bird mechanics (pipes, gravity, score, sounds)
+- One unified window:
+    + left: camera view
+    + right: game view
+- Classic Flappy Bird gameplay (pipes, gravity, score, sounds)
 - Keyboard fallback (SPACE)
 
 ### 🧠 2. How the control works
@@ -24,14 +26,10 @@ The game tracks:
 
 When **both arms move down** and the angles drop below a threshold, a **flap is triggered**.
 
-Internally:
+Used keypoints (YOLOv8 format):
 
-- Shoulder / elbow landmarks: `11, 12, 13, 14`
-- Hip landmarks: `23, 24`
-- The angles are converted into a percentage
-- A flap is detected when both sides go from “up” → “down”
-
-This avoids repeated flaps while the arms stay in the same position.
+- Left side: 5, 7, 11
+- Right side: 6, 8, 12
 
 ## 🎯 3. Controls
 
@@ -43,7 +41,7 @@ This avoids repeated flaps while the arms stay in the same position.
 
 ### 📦 4. How to run
 
-Requirements: Python 3.8+
+Requirements: Python 3.9+
 
 4.1. Create virtual environment
 ```bash
