@@ -59,4 +59,9 @@ pip install -r requirements.txt
 python main.py
 ```
 
-Make sure your webcam is connected.
+### ⚠️ Important notes
+
+- Only the **first detected person** is used.
+- The model runs on GPU if available (use_gpu=True).
+- If CUDA is not available, it will automatically fall back to CPU.
+- Lighting and camera position strongly affect detection stability.
