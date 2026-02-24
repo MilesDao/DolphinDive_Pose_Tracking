@@ -51,7 +51,7 @@ class PoseDetector:
 
     def findAngle(self, img, p1, p2, p3, draw=True):
         """
-        Tính góc tại p2 tạo bởi 3 điểm p1, p2, p3.
+        calculate angle at p2 made by 3 points p1, p2, p3.
         """
         if not self.lmList or len(self.lmList) <= max(p1, p2, p3):
             return 0

@@ -74,9 +74,9 @@ def play_flappy_bird():
         pygame.image.load('assets/messagetemp.png').convert_alpha())
     game_over_rect = game_over_surface.get_rect(center=(216, 384))
 
-    flap_sound = pygame.mixer.Sound('assets/sound/sfx_wing.wav')
-    hit_sound = pygame.mixer.Sound('assets/sound/sfx_hit.wav')
-    score_sound = pygame.mixer.Sound('assets/sound/sfx_point.wav')
+    flap_sound = pygame.mixer.Sound('assets/audio/sfx_wing.wav')
+    hit_sound = pygame.mixer.Sound('assets/audio/sfx_hit.wav')
+    score_sound = pygame.mixer.Sound('assets/audio/sfx_point.wav')
     score_sound_countdown = 100
 
     # ------------ GAME FUNCTIONS ------------
@@ -108,10 +108,10 @@ def play_flappy_bird():
         nonlocal score, scored_pipes
 
         for pipe in pipes:
-            # chỉ tính pipe dưới
+            # only count the bottom pipe
             if pipe.bottom >= 600:
 
-                # chim đã bay qua pipe
+                # bird has flown through the pipe
                 if pipe.centerx < bird_rect.centerx:
                     pid = id(pipe)
 
@@ -185,11 +185,11 @@ def play_flappy_bird():
                 for fid in hand_ids:
                     if len(lmList) > fid and lmList[fid][1] != 0:
                         _, x, y = lmList[fid]
-                        cv2.circle(img, (x, y), 8, (0, 128, 255), cv2.FILLED)  # màu cam
+                        cv2.circle(img, (x, y), 8, (0, 128, 255), cv2.FILLED)  # orange
                         cv2.putText(img, str(fid), (x - 10, y - 10),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
 
-                # Nối xương tay trái & phải
+                # Connect left & right arm bones
                 if len(lmList) > 8 and lmList[5][1] != 0 and lmList[7][1] != 0:
                     cv2.line(img, tuple(lmList[5][1:]), tuple(lmList[7][1:]), (0, 128, 255), 2)
                 if len(lmList) > 8 and lmList[6][1] != 0 and lmList[8][1] != 0:
