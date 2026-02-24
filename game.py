@@ -185,20 +185,6 @@ def play_flappy_bird():
                     pygame.quit()
                     sys.exit()
 
-                if trigger_fly:
-                    flap_count += 1
-                    if game_active:
-                        bird_movement = 0
-                        bird_movement = -10
-                        flap_sound.play()
-                    else:
-                        game_active = True
-                        pipe_list.clear()
-                        bird_rect.center = (100, 384)
-                        bird_movement = 0
-                        score = 0
-                    trigger_fly = False
-
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_SPACE and game_active:
                         bird_movement = 0
@@ -217,6 +203,20 @@ def play_flappy_bird():
                 if event.type == birdflap:
                     bird_index = (bird_index + 1) % 3
                     bird, bird_rect = bird_animation()
+
+            if trigger_fly:
+                flap_count += 1
+                if game_active:
+                    bird_movement = 0
+                    bird_movement = -10
+                    flap_sound.play()
+                else:
+                    game_active = True
+                    pipe_list.clear()
+                    bird_rect.center = (100, 384)
+                    bird_movement = 0
+                    score = 0
+                trigger_fly = False
 
             # --- GAME LOGIC ---
             screen.blit(bg, (0, 0))

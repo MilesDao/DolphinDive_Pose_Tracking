@@ -26,7 +26,7 @@ class PoseDetector:
         self.lmList = []
 
     def findPose(self, img, draw=True):
-        """Tìm pose trong ảnh và vẽ khung xương nếu cần"""
+        """Find pose in image and draw skeleton if needed"""
         imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         self.results = self.pose.process(imgRGB)
 
@@ -39,7 +39,7 @@ class PoseDetector:
                     cv2.circle(img, (cx, cy), 8, (0, 128, 255), cv2.FILLED)
                     cv2.putText(img, str(idx), (cx - 10, cy - 10),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
-            # Nối vai–khuỷu tay hai bên
+            # Connect shoulders–elbows on both sides
             lms = self.results.pose_landmarks.landmark
             points = {i: (int(lms[i].x * w), int(lms[i].y * h)) for i in important_ids}
             if 11 in points and 13 in points:
@@ -49,7 +49,7 @@ class PoseDetector:
         return img
 
     def findPosition(self, img, draw=False):
-        """Trả về danh sách tọa độ (id, x, y) của các landmarks"""
+        """Returns the list of coordinates (id, x, y) of the landmarks"""
         self.lmList = []
         if not self.results or not self.results.pose_landmarks:
             return self.lmList
@@ -75,12 +75,19 @@ class PoseDetector:
         x2, y2 = self.lmList[p2][1:]
         x3, y3 = self.lmList[p3][1:]
 
-        # Tính góc (chuẩn hóa 0–180)
-        angle = math.degrees(math.atan2(y3 - y2, x3 - x2) -
-                             math.atan2(y1 - y2, x1 - x2))
-        angle = abs(angle)
-        if angle > 180:
-            angle = 360 - angle
+        # Calculate distance between points
+        a = math.hypot(x3 - x2, y3 - y2)
+        c = math.hypot(x1 - x2, y1 - y2)
+        b = math.hypot(x1 - x3, y1 - y3)
+
+        if a * c == 0:
+            angle = 0.0
+        else:
+            # Law of cosines
+            cos_b = (a**2 + c**2 - b**2) / (2 * a * c)
+            # Clamp cos_b to [-1, 1] to avoid math domain error due to floating point precision
+            cos_b = max(-1.0, min(1.0, cos_b))
+            angle = math.degrees(math.acos(cos_b))
 
         if draw:
             cv2.line(img, (x1, y1), (x2, y2), (255, 255, 255), 2)
@@ -92,7 +99,7 @@ class PoseDetector:
         return angle
 
     def findBoundingBox(self):
-        """Trả về bounding box của toàn thân (min_x, min_y, max_x, max_y)"""
+        """Returns the bounding box of the entire body (min_x, min_y, max_x, max_y)"""
         if not self.lmList:
             return None
         xs = [pt[1] for pt in self.lmList]
