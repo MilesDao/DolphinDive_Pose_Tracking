@@ -41,11 +41,11 @@ def play_flappy_bird():
     floor_x_pos = 0
 
     bird_down = pygame.transform.scale2x(pygame.image.load(
-        'assets/yellowbird-downflap.png').convert_alpha())
+        'assets/down.png').convert_alpha())
     bird_mid = pygame.transform.scale2x(pygame.image.load(
-        'assets/yellowbird-midflap.png').convert_alpha())
+        'assets/mid.png').convert_alpha())
     bird_up = pygame.transform.scale2x(pygame.image.load(
-        'assets/yellowbird-upflap.png').convert_alpha())
+        'assets/up.png').convert_alpha())
 
     bird_list = [bird_down, bird_mid, bird_up]
     bird_index = 0
@@ -55,7 +55,7 @@ def play_flappy_bird():
     birdflap = pygame.USEREVENT + 1
     pygame.time.set_timer(birdflap, 200)
 
-    pipe_surface = pygame.image.load('assets/pipe-green.png').convert()
+    pipe_surface = pygame.image.load('assets/pipe.png').convert()
     pipe_surface = pygame.transform.scale2x(pipe_surface)
     pipe_list = []
 

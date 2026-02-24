@@ -2,7 +2,7 @@ import os
 import sys
 import pygame as pg
 
-from flappy import play_flappy_bird
+from game import play_flappy_bird
 
 os.environ["SDL_VIDEO_CENTERED"] = '1'
 pg.init()
