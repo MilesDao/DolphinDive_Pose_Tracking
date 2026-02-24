@@ -58,7 +58,7 @@ pip install -r requirements.txt
 ```
 4.3
 ```bash
-python game.py
+python main.py
 ```
 
 Make sure your webcam is connected.
