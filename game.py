@@ -8,8 +8,10 @@ from PoseDetector import PoseDetector
 
 wCam, hCam = 640, 360
 
-CAM_W, CAM_H = 640, 360
 GAME_W, GAME_H = 432, 768
+
+CAM_H = GAME_H
+CAM_W = int(CAM_H * 16 / 9)
 
 WINDOW_W = CAM_W + GAME_W
 WINDOW_H = GAME_H
