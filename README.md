@@ -7,7 +7,8 @@ A Flappy Bird–style game controlled by **arm movements** using real-time human
 
 This project focuses on **real-time computer vision** and human–computer interaction.
 
-### ✨ 1. Features
+
+## 1. Features
 
 - Control the bird by **raising and lowering both arms**
 - Real-time pose estimation using YOLOv8 pose model
@@ -18,7 +19,9 @@ This project focuses on **real-time computer vision** and human–computer inter
 - Classic Flappy Bird gameplay (pipes, gravity, score, sounds)
 - Keyboard fallback (SPACE)
 
-### 🧠 2. How the control works
+![App Demo](./doc/demo.gif)
+
+## 2. How the control works
 
 The game tracks:
 - Left arm angle: `(elbow – shoulder – hip)`
@@ -31,7 +34,7 @@ Used keypoints (YOLOv8 format):
 - Left side: 5, 7, 11
 - Right side: 6, 8, 12
 
-## 🎯 3. Controls
+## 3. Controls
 
 | Action          | Method                                              |
 |-----------------|-----------------------------------------------------|
@@ -39,7 +42,7 @@ Used keypoints (YOLOv8 format):
 | Flap (fallback) | Press `SPACE`                                      |
 | Quit            | Press `q` (camera window) or close the game window |
 
-### 📦 4. How to run
+## 4. How to run
 
 Requirements: Python 3.9+
 
@@ -59,7 +62,7 @@ pip install -r requirements.txt
 python main.py
 ```
 
-### ⚠️ Important notes
+## ⚠️ Important notes
 
 - Only the **first detected person** is used.
 - The model runs on GPU if available (use_gpu=True).
