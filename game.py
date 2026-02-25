@@ -5,6 +5,21 @@ import cv2
 import numpy as np
 from PoseDetector import PoseDetector
 
+class PoseSmoother:
+    def __init__(self, alpha=0.4):
+        self.alpha = alpha
+        self.smoothed_value_x = None
+        self.smoothed_value_y = None
+
+    def update(self, current_x, current_y):
+        if self.smoothed_value_x is None:
+            self.smoothed_value_x = current_x
+            self.smoothed_value_y = current_y
+        else:
+            self.smoothed_value_x = (self.alpha * current_x) + ((1.0 - self.alpha) * self.smoothed_value_x)
+            self.smoothed_value_y = (self.alpha * current_y) + ((1.0 - self.alpha) * self.smoothed_value_y)
+        return int(self.smoothed_value_x), int(self.smoothed_value_y)
+
 
 wCam, hCam = 640, 360
 
@@ -21,7 +36,11 @@ def play_flappy_bird():
     cap = cv2.VideoCapture(0)
     cap.set(3, wCam)
     cap.set(4, hCam)
-    detector = PoseDetector(model_path="yolov8n-pose.pt", use_gpu=True)
+    detector = PoseDetector(model_path="runs/pose/train/weights/best.pt", use_gpu=True)
+
+    # Initialize smoothers for the hand/arm keypoints
+    left_smoother = PoseSmoother(alpha=0.5)
+    right_smoother = PoseSmoother(alpha=0.5)
 
     arm_raised = False
     trigger_fly = False
@@ -70,7 +89,8 @@ def play_flappy_bird():
     scored_pipes = set()
 
     pipe_height = range(250, 500)
-    frames_since_last_pipe = 0
+    last_pipe_time = pygame.time.get_ticks()
+    PIPE_INTERVAL = 3000   
 
     game_over_surface = pygame.transform.scale2x(
         pygame.image.load('assets/messagetemp.png').convert_alpha())
@@ -132,7 +152,7 @@ def play_flappy_bird():
         return True
 
     def perform_flap():
-        nonlocal game_active, bird_movement, score, frames_since_last_pipe
+        nonlocal game_active, bird_movement, score, last_pipe_time
         if game_active:
             bird_movement = 0
             bird_movement = -10
@@ -143,7 +163,7 @@ def play_flappy_bird():
             bird_rect.center = (100, 384)
             bird_movement = 0
             score = 0
-            frames_since_last_pipe = 0
+            last_pipe_time = pygame.time.get_ticks()
             scored_pipes.clear()
 
     def rotate_bird(bird1):
@@ -184,6 +204,22 @@ def play_flappy_bird():
 
             if len(lmList) != 0:
                 hand_ids = [5, 6, 7, 8] # shoulder, elbow
+                
+                # Apply smoothing to keypoints before using them
+                smoothed_lmList = [list(item) for item in lmList] # deeply copy
+                for i in range(len(lmList)):
+                    if i in [5, 7]: # Left arm
+                        if lmList[i][1] != 0:
+                            sx, sy = left_smoother.update(lmList[i][1], lmList[i][2])
+                            smoothed_lmList[i] = [lmList[i][0], sx, sy]
+                    elif i in [6, 8]: # Right arm
+                        if lmList[i][1] != 0:
+                            sx, sy = right_smoother.update(lmList[i][1], lmList[i][2])
+                            smoothed_lmList[i] = [lmList[i][0], sx, sy]
+                
+                # Overwrite original list with smoothed for calculation and drawing
+                lmList = smoothed_lmList
+                
                 for fid in hand_ids:
                     if len(lmList) > fid and lmList[fid][1] != 0:
                         _, x, y = lmList[fid]
@@ -193,9 +229,9 @@ def play_flappy_bird():
 
                 # Connect left & right arm bones
                 if len(lmList) > 8 and lmList[5][1] != 0 and lmList[7][1] != 0:
-                    cv2.line(img, tuple(lmList[5][1:]), tuple(lmList[7][1:]), (0, 128, 255), 2)
+                    cv2.line(img, tuple(lmList[5][1:3]), tuple(lmList[7][1:3]), (0, 128, 255), 2)
                 if len(lmList) > 8 and lmList[6][1] != 0 and lmList[8][1] != 0:
-                    cv2.line(img, tuple(lmList[6][1:]), tuple(lmList[8][1:]), (0, 128, 255), 2)
+                    cv2.line(img, tuple(lmList[6][1:3]), tuple(lmList[8][1:3]), (0, 128, 255), 2)
 
                 # --- HAND CONTROL ---
                 angleRight = detector.findAngle(img, 8, 6, 12)
@@ -249,11 +285,11 @@ def play_flappy_bird():
 
             if game_active:
                 # Pipe spawning
-                frames_since_last_pipe += 1
-                if frames_since_last_pipe >= 90:  # Spawn a pipe every 90 frames (90 frames * 5 pixels = 450 pixels spacing)
+                now = pygame.time.get_ticks()
+                if now - last_pipe_time >= PIPE_INTERVAL:
                     pipe_list.extend(create_pipe())
-                    frames_since_last_pipe = 0
-
+                    last_pipe_time = now
+                
                 bird_movement += gravity  
                 rotated_bird = rotate_bird(bird)
                 bird_rect.centery += bird_movement

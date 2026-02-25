@@ -112,3 +112,6 @@ build/
 *.bak
 *.swp
 *.tmp
+
+flappy_pose_dataset/
+runs/
