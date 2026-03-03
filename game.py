@@ -5,22 +5,6 @@ import cv2
 import numpy as np
 from PoseDetector import PoseDetector
 
-class PoseSmoother:
-    def __init__(self, alpha=0.4):
-        self.alpha = alpha
-        self.smoothed_value_x = None
-        self.smoothed_value_y = None
-
-    def update(self, current_x, current_y):
-        if self.smoothed_value_x is None:
-            self.smoothed_value_x = current_x
-            self.smoothed_value_y = current_y
-        else:
-            self.smoothed_value_x = (self.alpha * current_x) + ((1.0 - self.alpha) * self.smoothed_value_x)
-            self.smoothed_value_y = (self.alpha * current_y) + ((1.0 - self.alpha) * self.smoothed_value_y)
-        return int(self.smoothed_value_x), int(self.smoothed_value_y)
-
-
 wCam, hCam = 640, 360
 
 GAME_W, GAME_H = 432, 768
@@ -36,11 +20,7 @@ def play_flappy_bird():
     cap = cv2.VideoCapture(0)
     cap.set(3, wCam)
     cap.set(4, hCam)
-    detector = PoseDetector(model_path="runs/pose/train/weights/best.pt", use_gpu=True)
-
-    # Initialize smoothers for the hand/arm keypoints
-    left_smoother = PoseSmoother(alpha=0.5)
-    right_smoother = PoseSmoother(alpha=0.5)
+    detector = PoseDetector(model_path="yolov8n-pose.pt", use_gpu=True)
 
     arm_raised = False
     trigger_fly = False
@@ -204,21 +184,6 @@ def play_flappy_bird():
 
             if len(lmList) != 0:
                 hand_ids = [5, 6, 7, 8] # shoulder, elbow
-                
-                # Apply smoothing to keypoints before using them
-                smoothed_lmList = [list(item) for item in lmList] # deeply copy
-                for i in range(len(lmList)):
-                    if i in [5, 7]: # Left arm
-                        if lmList[i][1] != 0:
-                            sx, sy = left_smoother.update(lmList[i][1], lmList[i][2])
-                            smoothed_lmList[i] = [lmList[i][0], sx, sy]
-                    elif i in [6, 8]: # Right arm
-                        if lmList[i][1] != 0:
-                            sx, sy = right_smoother.update(lmList[i][1], lmList[i][2])
-                            smoothed_lmList[i] = [lmList[i][0], sx, sy]
-                
-                # Overwrite original list with smoothed for calculation and drawing
-                lmList = smoothed_lmList
                 
                 for fid in hand_ids:
                     if len(lmList) > fid and lmList[fid][1] != 0:
